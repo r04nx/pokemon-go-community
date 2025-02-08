@@ -3,6 +3,7 @@ import { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'pokemon-go-community',
   slug: 'pokemon-go-community',
+    owner: "atharva_01",
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -29,12 +30,21 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
-    'expo-build-properties',
+    'expo-build-properties'
   ],
   extra: {
     eas: {
-      projectId: "your-project-id"
+      projectId: "2cde2950-ecff-4fcd-a1ad-82bc6d2ce42e"
     }
+  },
+  web: {
+    bundler: 'metro'
+  },
+  updates: {
+    url: "https://u.expo.dev/2cde2950-ecff-4fcd-a1ad-82bc6d2ce42e"
+  },
+  runtimeVersion: {
+    policy: "appVersion"
   }
 };
 

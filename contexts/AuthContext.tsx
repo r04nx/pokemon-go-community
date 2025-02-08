@@ -2,9 +2,19 @@ import { Session, User, AuthError } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
+
+WebBrowser.maybeCompleteAuthSession();
+
+// Replace the hardcoded client IDs with environment variables
+const GOOGLE_CLIENT_ID_ANDROID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const GOOGLE_CLIENT_ID_EXPO = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +23,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ user: User; session: Session; } | undefined>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -155,17 +165,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: 'pokemongo-community://auth-callback',
-          skipBrowserRedirect: true
-        }
+      const redirectUrl = makeRedirectUri({
+        scheme: 'pokemongo-community',
+        path: 'google-auth',
+        preferLocalhost: false,
+        useProxy: true
       });
 
-      if (error) throw error;
-    } catch (error: any) {
-      handleAuthError(error, 'Google Sign In');
+      console.log('Redirect URL:', redirectUrl);
+
+      const clientId = Platform.select({
+        android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        default: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+      });
+
+      if (!clientId) {
+        throw new Error('Google Client ID is not configured');
+      }
+
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+      };
+
+      const client = new AuthSession.AuthRequest({
+        clientId,
+        scopes: ['openid', 'profile', 'email'],
+        redirectUri: redirectUrl,
+        responseType: 'id_token',
+        usePKCE: false,
+        extraParams: {
+          nonce: Math.random().toString(36).substring(7),
+          prompt: 'select_account',
+        },
+      });
+
+      const result = await client.promptAsync(discovery, {
+        useProxy: true,
+        showInRecents: true,
+      });
+
+      if (result.type === 'success' && result.params?.id_token) {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: result.params.id_token,
+        });
+
+        if (error) throw error;
+        
+        if (data.user) {
+          await loadUserProfile(data.user.id);
+        }
+
+        return data;
+      }
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
     }
   };
 
