@@ -43,6 +43,7 @@ const staticStyles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     opacity: 0.9,
+    marginBottom: 14,
   },
   guideCharacter: {
     marginTop: -20,
@@ -892,7 +893,7 @@ export default function LostFoundScreen() {
         )}
       </ScrollView>
 
-      {!showForm && (
+      {!showForm && activeTab === 'lost' && (
         <TouchableOpacity
           onPress={handleFABPress}
           style={styles.fabContainer}
@@ -909,7 +910,7 @@ export default function LostFoundScreen() {
                 <Ionicons name="add" size={24} color="white" />
               </View>
               <ThemedText style={styles.fabText} color="white">
-                Report {activeTab === 'lost' ? 'Lost' : 'Found'} Item
+                Report Lost Item
               </ThemedText>
             </View>
           </LinearGradient>
